@@ -5,8 +5,14 @@ import {IAcrossMessageHandler} from "./interfaces/IAcrossMessageHandler.sol";
 import {IAcceleratingDistributor} from "./interfaces/IAcceleratingDistributor.sol";
 import {IHubPool} from "./interfaces/IHubPool.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import "forge-std/console.sol";
 
 contract CrossChainStaker is IAcrossMessageHandler {
+    using SafeERC20 for IERC20;
+
+    error MessageWrongLength(uint256 length);
+
     IHubPool public immutable hubPool;
     IAcceleratingDistributor public immutable acceleratingDistributor;
 
@@ -15,16 +21,36 @@ contract CrossChainStaker is IAcrossMessageHandler {
         acceleratingDistributor = _acceleratingDistributor;
     }
 
-    function handleAcrossMessage(address tokenSent, uint256 amount, bool, address, bytes memory message) external {
-        (address userAddress) = abi.decode(message, (address));
-        (IERC20 lpToken, uint256 lpAmount) = _deposit(tokenSent, amount);
-        acceleratingDistributor.stakeFor(address(lpToken), lpAmount, userAddress);
+    function depositAndStake(IERC20 token, uint256 amount) external {
+        depositAndDonateStake(token, amount, msg.sender);
     }
 
-    function _deposit(address token, uint256 depositAmount) private returns (IERC20 lpToken, uint256 lpAmount) {
-        IHubPool.PooledToken memory pooledToken = hubPool.pooledTokens(token);
-        hubPool.addLiquidity(token, depositAmount);
+    function handleAcrossMessage(address tokenSent, uint256 amount, bool, address, bytes memory message) external {
+        (address beneficiary) = abi.decode(message, (address));
+        _depositAndStake(IERC20(tokenSent), amount, beneficiary);
+    }
+
+    function depositAndDonateStake(IERC20 token, uint256 amount, address beneficiary) public {
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        _depositAndStake(token, amount, beneficiary);
+    }
+
+    function _depositAndStake(IERC20 token, uint256 amount, address beneficiary) private {
+        (IERC20 lpToken, uint256 lpAmount) = _deposit(token, amount);
+        _stake(lpToken, lpAmount, beneficiary);
+    }
+
+    function _deposit(IERC20 token, uint256 depositAmount) private returns (IERC20 lpToken, uint256 lpAmount) {
+        IHubPool.PooledToken memory pooledToken = hubPool.pooledTokens(address(token));
+        token.safeIncreaseAllowance(address(hubPool), depositAmount);
+        
+        hubPool.addLiquidity(address(token), depositAmount);
         lpToken = IERC20(pooledToken.lpToken);
         lpAmount = lpToken.balanceOf(address(this));
+    }
+
+    function _stake(IERC20 lpToken, uint256 lpAmount, address beneficiary) private {
+        lpToken.safeIncreaseAllowance(address(acceleratingDistributor), lpAmount);
+        acceleratingDistributor.stakeFor(address(lpToken), lpAmount, beneficiary);
     }
 }
