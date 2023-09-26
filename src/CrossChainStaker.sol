@@ -6,7 +6,6 @@ import {IAcceleratingDistributor} from "./interfaces/IAcceleratingDistributor.so
 import {IHubPool} from "./interfaces/IHubPool.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import "forge-std/console.sol";
 
 contract CrossChainStaker is IAcrossMessageHandler {
     using SafeERC20 for IERC20;
@@ -43,7 +42,7 @@ contract CrossChainStaker is IAcrossMessageHandler {
     function _deposit(IERC20 token, uint256 depositAmount) private returns (IERC20 lpToken, uint256 lpAmount) {
         IHubPool.PooledToken memory pooledToken = hubPool.pooledTokens(address(token));
         token.safeIncreaseAllowance(address(hubPool), depositAmount);
-        
+
         hubPool.addLiquidity(address(token), depositAmount);
         lpToken = IERC20(pooledToken.lpToken);
         lpAmount = lpToken.balanceOf(address(this));
