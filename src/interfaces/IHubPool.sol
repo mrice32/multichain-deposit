@@ -13,5 +13,5 @@ interface IHubPool {
 
     function addLiquidity(address l1Token, uint256 l1TokenAmount) external payable;
     function removeLiquidity(address l1Token, uint256 lpTokenAmount, bool sendEth) external;
-    function pooledTokens(address l1Token) view external returns (PooledToken memory);
+    function pooledTokens(address l1Token) external view returns (PooledToken memory);
 }
